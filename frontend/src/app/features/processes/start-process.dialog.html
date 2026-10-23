@@ -1,0 +1,116 @@
+<div class="head" [style.background]="meta.soft">
+  <span class="icon" [style.background]="meta.color"><mat-icon>{{ meta.icon }}</mat-icon></span>
+  <div>
+    <h2>{{ meta.title }}</h2>
+    <p>{{ meta.description }}</p>
+  </div>
+</div>
+
+@if (submitting()) {
+  <mat-progress-bar mode="indeterminate" />
+}
+
+<form [formGroup]="form" (ngSubmit)="submit()">
+  <mat-dialog-content>
+    <mat-form-field appearance="outline">
+      <mat-label>{{ meta.key === 'vacationApproval' ? 'Colaborador' : 'Solicitante' }}</mat-label>
+      <input matInput formControlName="requester" maxlength="80" autocomplete="name" />
+      <mat-icon matPrefix>person</mat-icon>
+      @if (form.controls.requester.hasError('required')) {
+        <mat-error>Informe o nome.</mat-error>
+      }
+    </mat-form-field>
+
+    @if (isActive('title')) {
+      <mat-form-field appearance="outline">
+        <mat-label>Título</mat-label>
+        <input matInput formControlName="title" maxlength="120" />
+        <mat-error>Informe o título.</mat-error>
+      </mat-form-field>
+    }
+
+    @if (isActive('description')) {
+      <mat-form-field appearance="outline">
+        <mat-label>Descrição</mat-label>
+        <textarea matInput formControlName="description" rows="2"
+                  [maxlength]="meta.key === 'purchaseApproval' ? 255 : 1000"></textarea>
+        <mat-error>A descrição é obrigatória.</mat-error>
+      </mat-form-field>
+    }
+
+    @if (isActive('amount')) {
+      <mat-form-field appearance="outline">
+        <mat-label>{{ meta.key === 'parallelApproval' ? 'Valor estimado (R$)' : 'Valor (R$)' }}</mat-label>
+        <input matInput type="number" min="0.01" step="0.01" formControlName="amount" />
+        <mat-icon matPrefix>payments</mat-icon>
+        <mat-error>Informe um valor maior que zero.</mat-error>
+      </mat-form-field>
+    }
+
+    @if (isActive('startDate')) {
+      <div class="row">
+        <mat-form-field appearance="outline">
+          <mat-label>Data inicial</mat-label>
+          <input matInput [matDatepicker]="startPicker" formControlName="startDate" [min]="today" />
+          <mat-datepicker-toggle matIconSuffix [for]="startPicker" />
+          <mat-datepicker #startPicker />
+          <mat-error>Informe a data inicial.</mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Data final</mat-label>
+          <input matInput [matDatepicker]="endPicker" formControlName="endDate"
+                 [min]="form.controls.startDate.value ?? today" />
+          <mat-datepicker-toggle matIconSuffix [for]="endPicker" />
+          <mat-datepicker #endPicker />
+          <mat-error>Informe a data final.</mat-error>
+        </mat-form-field>
+      </div>
+      <p class="hint">O período é validado pelo backend (entre 5 e 30 dias, sem datas passadas).</p>
+    }
+
+    @if (isActive('system')) {
+      <div class="row">
+        <mat-form-field appearance="outline">
+          <mat-label>Sistema</mat-label>
+          <input matInput formControlName="system" maxlength="120" placeholder="ex.: ERP Financeiro" />
+          <mat-error>Informe o sistema.</mat-error>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Nível de acesso</mat-label>
+          <mat-select formControlName="accessLevel">
+            @for (level of accessLevels; track level.value) {
+              <mat-option [value]="level.value">{{ level.label }}</mat-option>
+            }
+          </mat-select>
+          <mat-error>Selecione o nível.</mat-error>
+        </mat-form-field>
+      </div>
+    }
+
+    @if (isActive('justification')) {
+      <mat-form-field appearance="outline">
+        <mat-label>Justificativa{{ meta.key === 'purchaseApproval' ? ' (opcional)' : '' }}</mat-label>
+        <textarea matInput formControlName="justification" rows="2" maxlength="1000"></textarea>
+        <mat-error>A justificativa é obrigatória.</mat-error>
+      </mat-form-field>
+    }
+
+    @if (isActive('notes')) {
+      <mat-form-field appearance="outline">
+        <mat-label>Observações</mat-label>
+        <textarea matInput formControlName="notes" rows="2" maxlength="500"></textarea>
+      </mat-form-field>
+    }
+
+    @if (serverError(); as message) {
+      <div class="server-error" role="alert"><mat-icon>error</mat-icon>{{ message }}</div>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" mat-dialog-close>Cancelar</button>
+    <button mat-flat-button type="submit" [disabled]="submitting()">
+      <mat-icon>play_arrow</mat-icon> Iniciar processo
+    </button>
+  </mat-dialog-actions>
+</form>

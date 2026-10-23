@@ -1,0 +1,82 @@
+# FlowableLab — ambiente completo com um único comando:
+#   docker compose up --build -d
+#
+# O Flowable Open Source roda INCORPORADO ao backend Spring Boot (não há contêiner do motor).
+
+name: flowablelab
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    container_name: flowablelab-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-flowablelab}
+      POSTGRES_USER: ${POSTGRES_USER:-flowablelab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-flowablelab}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  backend:
+    build:
+      context: ./backend
+    image: flowablelab-backend:local
+    container_name: flowablelab-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Comunicação interna pelo nome do serviço (nunca localhost entre contêineres).
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-flowablelab}
+      DB_USER: ${POSTGRES_USER:-flowablelab}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-flowablelab}
+      DEMO_DATA_ENABLED: ${DEMO_DATA_ENABLED:-true}
+      TZ: ${TZ:-America/Sao_Paulo}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      start_period: 90s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  frontend:
+    build:
+      context: ./frontend
+    image: flowablelab-frontend:local
+    container_name: flowablelab-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-4200}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+volumes:
+  postgres-data:

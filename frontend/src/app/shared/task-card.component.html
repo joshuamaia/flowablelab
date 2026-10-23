@@ -1,0 +1,59 @@
+@let t = task();
+<article class="fl-card task">
+  <header>
+    <span class="icon" [style.background]="meta().soft" [style.color]="meta().color">
+      <mat-icon>{{ meta().icon }}</mat-icon>
+    </span>
+    <div class="title">
+      <strong>{{ t.name }}</strong>
+      <small>
+        {{ t.processDefinitionName }} ·
+        <a class="fl-mono" [routerLink]="['/instances', t.processInstanceId]">{{ t.businessKey }}</a>
+      </small>
+    </div>
+    <fl-status-chip [status]="t.status" />
+  </header>
+
+  <dl>
+    @for (f of fields(); track f.key) {
+      <div>
+        <dt>{{ f.label }}</dt>
+        <dd>{{ f.money ? ($any(f.value) | currency: 'BRL') : f.value }}</dd>
+      </div>
+    }
+  </dl>
+
+  <footer>
+    <div class="meta">
+      <span matTooltip="Grupo responsável"><mat-icon>group</mat-icon>{{ t.assignee ?? t.candidateGroups.join(', ') }}</span>
+      <span matTooltip="Criada em"><mat-icon>schedule</mat-icon>{{ t.createdAt | date: 'dd/MM/yyyy HH:mm' }}</span>
+      @if (t.status !== 'PENDING') {
+        <span><mat-icon>timer</mat-icon>{{ t.durationMillis | duration }}</span>
+      }
+    </div>
+
+    @if (t.status === 'PENDING') {
+      <div class="actions">
+        @if (!eligible()) {
+          <span class="not-eligible" matTooltip="Troque o perfil no cabeçalho">
+            <mat-icon>lock</mat-icon> Grupo {{ t.candidateGroups.join(', ') }}
+          </span>
+        }
+        @for (a of t.allowedActions; track a) {
+          <button
+            [class]="'act ' + a.toLowerCase()"
+            mat-flat-button
+            [disabled]="busy()"
+            (click)="action.emit(a)"
+          >
+            <mat-icon>{{ icon(a) }}</mat-icon>{{ labels[a] }}
+          </button>
+        }
+      </div>
+    } @else if (t.decision) {
+      <div class="decision" [class]="'decision ' + t.decision.toLowerCase()">
+        {{ labels[t.decision] }}@if (t.comment) { — “{{ t.comment }}”}
+      </div>
+    }
+  </footer>
+</article>

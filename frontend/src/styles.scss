@@ -1,0 +1,210 @@
+@use '@angular/material' as mat;
+@use 'material-symbols/rounded.css';
+
+// ---------------------------------------------------------------------------
+// Tema Angular Material (M3) personalizado
+// ---------------------------------------------------------------------------
+html {
+  color-scheme: light;
+  @include mat.theme((
+    color: (
+      primary: mat.$violet-palette,
+      tertiary: mat.$azure-palette,
+    ),
+    typography: (
+      plain-family: 'Inter, "Segoe UI", Roboto, system-ui, -apple-system, sans-serif',
+      brand-family: 'Inter, "Segoe UI", Roboto, system-ui, -apple-system, sans-serif',
+    ),
+    density: 0,
+  ));
+
+  @include mat.card-overrides((
+    elevated-container-shape: 16px,
+    outlined-container-shape: 16px,
+  ));
+  @include mat.dialog-overrides((
+    container-shape: 20px,
+  ));
+}
+
+// ---------------------------------------------------------------------------
+// Tokens da aplicação
+// ---------------------------------------------------------------------------
+:root {
+  --fl-bg: #f5f6fb;
+  --fl-surface: #ffffff;
+  --fl-border: #e7e8f0;
+  --fl-text: #1d1b2c;
+  --fl-muted: #6b6a7d;
+  --fl-primary: #6d4aff;
+  --fl-primary-soft: #efeaff;
+  --fl-shadow: 0 1px 2px rgba(25, 20, 60, .04), 0 6px 20px rgba(25, 20, 60, .06);
+  --fl-radius: 16px;
+
+  // Estados BPMN — os mesmos usados no visualizador
+  --fl-active: #2f6bff;
+  --fl-active-soft: #e6eeff;
+  --fl-completed: #16a34a;
+  --fl-completed-soft: #e3f6ea;
+  --fl-failed: #e11d48;
+  --fl-failed-soft: #ffe4ea;
+  --fl-neutral: #9a9aae;
+  --fl-warning: #d97706;
+  --fl-warning-soft: #fff3df;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--fl-bg);
+  color: var(--fl-text);
+  font-family: Inter, "Segoe UI", Roboto, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--fl-primary);
+}
+
+// ---------------------------------------------------------------------------
+// Utilitários de layout
+// ---------------------------------------------------------------------------
+.fl-page {
+  padding: 28px 32px 48px;
+  max-width: 1440px;
+  margin: 0 auto;
+  box-sizing: border-box;
+
+  @media (max-width: 720px) {
+    padding: 16px;
+  }
+}
+
+.fl-card {
+  background: var(--fl-surface);
+  border: 1px solid var(--fl-border);
+  border-radius: var(--fl-radius);
+  box-shadow: var(--fl-shadow);
+}
+
+.fl-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 6px;
+
+  h2, h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+}
+
+.fl-muted {
+  color: var(--fl-muted);
+}
+
+.fl-grid {
+  display: grid;
+  gap: 20px;
+}
+
+.fl-mono {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: .85em;
+}
+
+.fl-spacer {
+  flex: 1;
+}
+
+// Tabelas Material mais leves
+.mat-mdc-table {
+  background: transparent !important;
+}
+
+.mat-mdc-header-cell {
+  color: var(--fl-muted);
+  font-weight: 600 !important;
+  font-size: .78rem;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+.mat-mdc-row.fl-clickable:hover {
+  background: var(--fl-primary-soft);
+  cursor: pointer;
+}
+
+// ---------------------------------------------------------------------------
+// Marcadores BPMN (bpmn-js) — aplicados pelos IDs reais dos elementos
+// ---------------------------------------------------------------------------
+.djs-container {
+  .fl-active:not(.djs-connection) .djs-visual > :first-child {
+    stroke: var(--fl-active) !important;
+    stroke-width: 3px !important;
+    fill: var(--fl-active-soft) !important;
+  }
+  .fl-active.djs-shape .djs-visual > :first-child {
+    animation: fl-pulse 1.6s ease-in-out infinite;
+  }
+  .fl-completed:not(.djs-connection) .djs-visual > :first-child {
+    stroke: var(--fl-completed) !important;
+    stroke-width: 2.5px !important;
+    fill: var(--fl-completed-soft) !important;
+  }
+  .fl-failed:not(.djs-connection) .djs-visual > :first-child {
+    stroke: var(--fl-failed) !important;
+    stroke-width: 3px !important;
+    fill: var(--fl-failed-soft) !important;
+  }
+  .djs-connection.fl-completed .djs-visual > path {
+    stroke: var(--fl-completed) !important;
+    stroke-width: 2.5px !important;
+  }
+  .fl-selected .djs-outline {
+    visibility: visible !important;
+    stroke: var(--fl-primary) !important;
+    stroke-width: 3px !important;
+    stroke-dasharray: 6 4;
+  }
+}
+
+@keyframes fl-pulse {
+  0%, 100% { stroke-opacity: 1; }
+  50% { stroke-opacity: .35; }
+}
+
+.fl-count-badge {
+  background: var(--fl-text);
+  color: #fff;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  white-space: nowrap;
+}
+
+.fl-error-badge {
+  background: var(--fl-failed);
+  color: #fff;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+}
+
+// Snackbars
+.fl-snack-error {
+  --mat-snack-bar-container-color: #3b0a16;
+  --mat-snack-bar-supporting-text-color: #ffe4ea;
+}
+
+.fl-snack-success {
+  --mat-snack-bar-container-color: #0c2e1a;
+  --mat-snack-bar-supporting-text-color: #e3f6ea;
+}

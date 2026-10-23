@@ -1,0 +1,65 @@
+<div class="viewer" [style.height]="height()">
+  <div #canvas class="canvas"></div>
+
+  @if (error(); as message) {
+    <div class="error">
+      <mat-icon>error</mat-icon>
+      {{ message }}
+    </div>
+  }
+
+  <div class="toolbar">
+    <button mat-icon-button matTooltip="Aproximar" (click)="zoomIn()"><mat-icon>zoom_in</mat-icon></button>
+    <button mat-icon-button matTooltip="Afastar" (click)="zoomOut()"><mat-icon>zoom_out</mat-icon></button>
+    <button mat-icon-button matTooltip="Ajustar à tela" (click)="fit()"><mat-icon>fit_screen</mat-icon></button>
+  </div>
+
+  <div class="legend">
+    <span><i class="dot active"></i>Ativa</span>
+    <span><i class="dot completed"></i>Concluída</span>
+    <span><i class="dot failed"></i>Falha</span>
+    <span><i class="dot neutral"></i>Não executada</span>
+  </div>
+
+  @if (selected(); as element) {
+    <aside class="details">
+      <header>
+        <div>
+          <small>{{ typeLabels[element.type] ?? element.type }}</small>
+          <h4>{{ element.name }}</h4>
+          <code>{{ element.id }}</code>
+        </div>
+        <button mat-icon-button (click)="clearSelection()" aria-label="Fechar detalhes"><mat-icon>close</mat-icon></button>
+      </header>
+
+      @if (selectedState(); as st) {
+        <p class="status" [class]="'status ' + st.status.toLowerCase()">
+          {{ statusLabels[st.status] }} · {{ st.executionCount }} execução(ões)
+        </p>
+        @if (st.failureMessage) {
+          <p class="failure">{{ st.failureMessage }}</p>
+        }
+      } @else if (state()) {
+        <p class="status neutral">Ainda não executada nesta instância</p>
+      } @else {
+        <p class="status neutral">Selecione uma instância para ver o estado de execução</p>
+      }
+
+      @for (exec of selectedExecutions(); track exec.id) {
+        <div class="exec">
+          <div><span class="fl-muted">Início</span> {{ exec.startTime | date: 'dd/MM/yyyy HH:mm:ss' }}</div>
+          <div>
+            <span class="fl-muted">Fim</span>
+            {{ exec.endTime ? (exec.endTime | date: 'dd/MM/yyyy HH:mm:ss') : 'em andamento' }}
+          </div>
+          @if (exec.durationMillis !== null) {
+            <div><span class="fl-muted">Duração</span> {{ exec.durationMillis | duration }}</div>
+          }
+          @if (exec.assignee) {
+            <div><span class="fl-muted">Responsável</span> {{ exec.assignee }}</div>
+          }
+        </div>
+      }
+    </aside>
+  }
+</div>

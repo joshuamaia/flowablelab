@@ -1,0 +1,117 @@
+<div class="fl-page">
+  <fl-page-header
+    title="Solicitações"
+    subtitle="Solicitações de negócio correlacionadas às instâncias BPMN pelo businessKey."
+  >
+    <a mat-flat-button routerLink="/processes"><mat-icon>add</mat-icon> Nova solicitação</a>
+  </fl-page-header>
+
+  <section class="fl-card">
+    <div class="filters">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Status</mat-label>
+        <mat-select [value]="status()" (valueChange)="setStatus($event)">
+          <mat-option [value]="null">Todos</mat-option>
+          @for (s of statusOptions; track s[0]) {
+            <mat-option [value]="s[0]">{{ s[1] }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Tipo</mat-label>
+        <mat-select [value]="type()" (valueChange)="setType($event)">
+          <mat-option [value]="null">Todos</mat-option>
+          @for (t of types; track t.type) {
+            <mat-option [value]="t.type">{{ t.title }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <span class="fl-spacer"></span>
+      <span class="fl-muted count">{{ total() }} solicitação(ões)</span>
+    </div>
+
+    @if (requests.isLoading()) {
+      <mat-progress-bar mode="indeterminate" />
+    }
+    @if (error(); as message) {
+      <p class="error"><mat-icon>error</mat-icon> {{ message }}</p>
+    }
+
+    <div class="table-wrap">
+      <table mat-table [dataSource]="rows()" matSort [matSortActive]="sort().active"
+             [matSortDirection]="sort().direction" (matSortChange)="onSort($event)">
+        <ng-container matColumnDef="number">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Número</th>
+          <td mat-cell *matCellDef="let r"><span class="fl-mono">{{ r.number }}</span></td>
+        </ng-container>
+
+        <ng-container matColumnDef="type">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Tipo</th>
+          <td mat-cell *matCellDef="let r">
+            @let meta = processMeta(r.processKey);
+            <span class="type">
+              <span class="icon" [style.background]="meta.soft" [style.color]="meta.color"><mat-icon>{{ meta.icon }}</mat-icon></span>
+              <span>
+                {{ r.typeLabel }}
+                <small class="fl-muted">{{ r.summary }}@if (r.amount) { · {{ r.amount | currency: 'BRL' }}}</small>
+              </span>
+            </span>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="requester">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Solicitante</th>
+          <td mat-cell *matCellDef="let r">{{ r.requester }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="openedAt">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Abertura</th>
+          <td mat-cell *matCellDef="let r">{{ r.openedAt | date: 'dd/MM/yyyy HH:mm' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
+          <td mat-cell *matCellDef="let r">
+            <fl-status-chip [status]="r.status" [matTooltip]="r.statusDetail ?? ''" />
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="step">
+          <th mat-header-cell *matHeaderCellDef>Etapa atual</th>
+          <td mat-cell *matCellDef="let r">
+            @if (r.currentSteps.length) {
+              <span class="step">{{ r.currentSteps.join(' + ') }}</span>
+            } @else {
+              <span class="fl-muted">—</span>
+            }
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let r" (click)="$event.stopPropagation()">
+            <a mat-icon-button matTooltip="Diagrama BPMN" [routerLink]="['/viewer']" [queryParams]="{ instance: r.processInstanceId }">
+              <mat-icon>schema</mat-icon>
+            </a>
+            <a mat-icon-button matTooltip="Histórico" [routerLink]="['/history']" [queryParams]="{ instance: r.processInstanceId }">
+              <mat-icon>history</mat-icon>
+            </a>
+            <a mat-icon-button matTooltip="Detalhes" [routerLink]="['/instances', r.processInstanceId]">
+              <mat-icon>chevron_right</mat-icon>
+            </a>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="columns"></tr>
+        <tr mat-row *matRowDef="let row; columns: columns" class="fl-clickable" (click)="open(row)"></tr>
+      </table>
+    </div>
+
+    @if (!requests.isLoading() && rows().length === 0) {
+      <fl-empty-state title="Nenhuma solicitação encontrada" message="Ajuste os filtros ou inicie um novo processo." />
+    }
+
+    <mat-paginator [length]="total()" [pageIndex]="page()" [pageSize]="size()" [pageSizeOptions]="[5, 10, 20, 50]"
+                   (page)="onPage($event)" aria-label="Paginação de solicitações" />
+  </section>
+</div>

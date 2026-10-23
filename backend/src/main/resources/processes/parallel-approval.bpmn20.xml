@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI"
+             typeLanguage="http://www.w3.org/2001/XMLSchema"
+             expressionLanguage="http://www.w3.org/1999/XPath"
+             targetNamespace="http://flowablelab.com/processes">
+
+  <process id="parallelApproval" name="Aprovação paralela" isExecutable="true">
+    <documentation>Análises técnica e financeira executadas em paralelo (Parallel Gateway). O processo só avança quando ambas são concluídas.</documentation>
+
+    <startEvent id="start" name="Início" flowable:initiator="initiator"/>
+    <sequenceFlow id="flowStartToOpen" sourceRef="start" targetRef="openRequest"/>
+
+    <userTask id="openRequest" name="Abrir solicitação" flowable:candidateGroups="colaborador">
+      <documentation>O colaborador confirma a abertura e envia para as análises.</documentation>
+    </userTask>
+    <sequenceFlow id="flowOpenToFork" sourceRef="openRequest" targetRef="forkGateway"/>
+
+    <parallelGateway id="forkGateway" name="Dividir análises"/>
+    <sequenceFlow id="flowForkToTechnical" sourceRef="forkGateway" targetRef="technicalAnalysis"/>
+    <sequenceFlow id="flowForkToFinancial" sourceRef="forkGateway" targetRef="financialAnalysis"/>
+
+    <userTask id="technicalAnalysis" name="Análise técnica" flowable:candidateGroups="ti">
+      <documentation>Avaliação técnica da solicitação pela equipe de TI.</documentation>
+    </userTask>
+    <userTask id="financialAnalysis" name="Análise financeira" flowable:candidateGroups="gestor">
+      <documentation>Avaliação financeira da solicitação pelo gestor.</documentation>
+    </userTask>
+    <sequenceFlow id="flowTechnicalToJoin" sourceRef="technicalAnalysis" targetRef="joinGateway"/>
+    <sequenceFlow id="flowFinancialToJoin" sourceRef="financialAnalysis" targetRef="joinGateway"/>
+
+    <!-- Junção: aguarda a chegada dos dois ramos antes de prosseguir. -->
+    <parallelGateway id="joinGateway" name="Aguardar análises"/>
+    <sequenceFlow id="flowJoinToConsolidate" sourceRef="joinGateway" targetRef="consolidateAnalyses"/>
+
+    <serviceTask id="consolidateAnalyses" name="Consolidar análises" flowable:delegateExpression="${consolidateAnalysesDelegate}"/>
+    <sequenceFlow id="flowConsolidateToEnd" sourceRef="consolidateAnalyses" targetRef="end"/>
+
+    <endEvent id="end" name="Fim">
+      <extensionElements>
+        <flowable:executionListener event="start" expression="${requestOutcome.record(execution, consolidatedApproved ? 'APPROVED' : 'REJECTED')}"/>
+      </extensionElements>
+    </endEvent>
+  </process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_parallelApproval">
+    <bpmndi:BPMNPlane id="BPMNPlane_parallelApproval" bpmnElement="parallelApproval">
+      <bpmndi:BPMNShape id="start_di" bpmnElement="start">
+        <omgdc:Bounds x="60" y="182" width="36" height="36"/>
+        <bpmndi:BPMNLabel><omgdc:Bounds x="62" y="225" width="32" height="14"/></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="openRequest_di" bpmnElement="openRequest">
+        <omgdc:Bounds x="150" y="160" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="forkGateway_di" bpmnElement="forkGateway">
+        <omgdc:Bounds x="320" y="175" width="50" height="50"/>
+        <bpmndi:BPMNLabel><omgdc:Bounds x="358" y="232" width="90" height="14"/></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="technicalAnalysis_di" bpmnElement="technicalAnalysis">
+        <omgdc:Bounds x="430" y="70" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="financialAnalysis_di" bpmnElement="financialAnalysis">
+        <omgdc:Bounds x="430" y="250" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="joinGateway_di" bpmnElement="joinGateway">
+        <omgdc:Bounds x="610" y="175" width="50" height="50"/>
+        <bpmndi:BPMNLabel><omgdc:Bounds x="526" y="232" width="100" height="14"/></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="consolidateAnalyses_di" bpmnElement="consolidateAnalyses">
+        <omgdc:Bounds x="720" y="160" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end_di" bpmnElement="end">
+        <omgdc:Bounds x="902" y="182" width="36" height="36"/>
+        <bpmndi:BPMNLabel><omgdc:Bounds x="908" y="225" width="24" height="14"/></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge id="flowStartToOpen_di" bpmnElement="flowStartToOpen">
+        <omgdi:waypoint x="96" y="200"/><omgdi:waypoint x="150" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flowOpenToFork_di" bpmnElement="flowOpenToFork">
+        <omgdi:waypoint x="270" y="200"/><omgdi:waypoint x="320" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flowForkToTechnical_di" bpmnElement="flowForkToTechnical">
+        <omgdi:waypoint x="345" y="175"/><omgdi:waypoint x="345" y="110"/><omgdi:waypoint x="430" y="110"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flowForkToFinancial_di" bpmnElement="flowForkToFinancial">
+        <omgdi:waypoint x="345" y="225"/><omgdi:waypoint x="345" y="290"/><omgdi:waypoint x="430" y="290"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flowTechnicalToJoin_di" bpmnElement="flowTechnicalToJoin">
+        <omgdi:waypoint x="550" y="110"/><omgdi:waypoint x="635" y="110"/><omgdi:waypoint x="635" y="175"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flowFinancialToJoin_di" bpmnElement="flowFinancialToJoin">
+        <omgdi:waypoint x="550" y="290"/><omgdi:waypoint x="635" y="290"/><omgdi:waypoint x="635" y="225"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flowJoinToConsolidate_di" bpmnElement="flowJoinToConsolidate">
+        <omgdi:waypoint x="660" y="200"/><omgdi:waypoint x="720" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flowConsolidateToEnd_di" bpmnElement="flowConsolidateToEnd">
+        <omgdi:waypoint x="840" y="200"/><omgdi:waypoint x="902" y="200"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>

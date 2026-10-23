@@ -1,0 +1,59 @@
+<div class="fl-page">
+  <fl-page-header
+    title="Tarefas"
+    [subtitle]="'User Tasks do Flowable para ' + users.profile().name + ' (' + users.profile().role + '). Troque o perfil no cabeçalho para ver as tarefas de outras equipes.'"
+  />
+
+  <section class="toolbar">
+    <mat-button-toggle-group [value]="scope()" (change)="setScope($event.value)" aria-label="Escopo das tarefas">
+      <mat-button-toggle value="mine"><mat-icon>inbox</mat-icon> Minhas pendentes</mat-button-toggle>
+      <mat-button-toggle value="all"><mat-icon>groups</mat-icon> Todas pendentes</mat-button-toggle>
+      <mat-button-toggle value="done"><mat-icon>task_alt</mat-icon> Concluídas por mim</mat-button-toggle>
+    </mat-button-toggle-group>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Processo</mat-label>
+      <mat-select [value]="processKey()" (valueChange)="setProcess($event)">
+        <mat-option [value]="null">Todos</mat-option>
+        @for (p of processes; track p.key) {
+          <mat-option [value]="p.key">{{ p.title }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <span class="fl-spacer"></span>
+    <span class="fl-muted">{{ total() }} tarefa(s)</span>
+  </section>
+
+  @if (tasks.isLoading()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+  @if (error(); as message) {
+    <p class="error"><mat-icon>error</mat-icon> {{ message }}</p>
+  }
+
+  <section class="grid">
+    @for (task of items(); track task.id) {
+      <fl-task-card
+        [task]="task"
+        [busy]="completion.busyTaskId() === task.id"
+        [eligible]="isEligible(task)"
+        (action)="run(task, $event)"
+      />
+    }
+  </section>
+
+  @if (!tasks.isLoading() && items().length === 0) {
+    <div class="fl-card">
+      <fl-empty-state
+        icon="celebration"
+        [title]="scope() === 'done' ? 'Nenhuma tarefa concluída por este perfil' : 'Nenhuma tarefa pendente'"
+        message="As tarefas aparecem aqui assim que o Flowable as cria."
+      />
+    </div>
+  }
+
+  @if (total() > size()) {
+    <mat-paginator [length]="total()" [pageIndex]="page()" [pageSize]="size()" [pageSizeOptions]="[12, 24, 48]"
+                   (page)="onPage($event)" />
+  }
+</div>

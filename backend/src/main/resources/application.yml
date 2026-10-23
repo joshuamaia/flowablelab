@@ -1,0 +1,70 @@
+spring:
+  application:
+    name: flowablelab
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/flowablelab}
+    username: ${DB_USER:flowablelab}
+    password: ${DB_PASSWORD:flowablelab}
+    hikari:
+      maximum-pool-size: 15
+      connection-timeout: 10000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: business
+  # Tabelas de negócio versionadas pelo Flyway em um schema próprio.
+  # As tabelas internas do Flowable (ACT_*) ficam no schema public e são geridas pelo motor.
+  flyway:
+    schemas: business
+    default-schema: business
+    create-schemas: true
+  mvc:
+    problemdetails:
+      enabled: true
+
+flowable:
+  # Cria/atualiza o schema do Flowable apenas quando necessário (banco vazio ou nova versão do motor).
+  database-schema-update: true
+  # "full" registra atividades, tarefas, variáveis e detalhes — necessário para o histórico e o visualizador.
+  history-level: full
+  check-process-definitions: true
+  process-definition-location-prefix: classpath*:/processes/
+  process-definition-location-suffixes: "**.bpmn20.xml"
+  deployment-name: flowablelab-processes
+  async-executor-activate: true
+  idm:
+    enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+
+flowablelab:
+  demo-data:
+    enabled: ${DEMO_DATA_ENABLED:true}
+
+logging:
+  pattern:
+    # O processInstanceId é incluído via MDC em todas as linhas registradas durante operações de workflow.
+    level: "%5p [pid:%X{processInstanceId:-}]"
+  level:
+    com.flowablelab: INFO
+    org.flowable: WARN

@@ -1,0 +1,177 @@
+<div class="fl-page">
+  @let d = r.details.value();
+
+  <fl-page-header
+    [title]="d?.request?.summary ?? d?.instance?.processDefinitionName ?? 'Instância de processo'"
+    [subtitle]="(d?.instance?.processDefinitionName ?? '') + ' · ' + (d?.instance?.businessKey ?? id())"
+  >
+    <button mat-stroked-button (click)="refresh.bump()"><mat-icon>refresh</mat-icon> Atualizar</button>
+    <a mat-stroked-button [routerLink]="['/viewer']" [queryParams]="{ instance: id() }"><mat-icon>schema</mat-icon> Tela cheia</a>
+  </fl-page-header>
+
+  @if (r.details.isLoading() && !d) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+
+  @if (error(); as message) {
+    <div class="fl-card">
+      <fl-empty-state icon="search_off" title="Instância indisponível" [message]="message" />
+    </div>
+  }
+
+  @if (d) {
+    <section class="summary fl-card">
+      <span class="icon" [style.background]="meta().soft" [style.color]="meta().color"><mat-icon>{{ meta().icon }}</mat-icon></span>
+      <div class="facts">
+        <div><small>Status</small>
+          @if (d.request) { <fl-status-chip [status]="d.request.status" /> } @else { <fl-status-chip [status]="d.instance.status" /> }
+        </div>
+        <div><small>Solicitação</small><strong class="fl-mono">{{ d.instance.businessKey }}</strong></div>
+        <div><small>Solicitante</small><strong>{{ d.request?.requester ?? '—' }}</strong></div>
+        <div><small>Início</small><strong>{{ d.instance.startTime | date: 'dd/MM/yyyy HH:mm' }}</strong></div>
+        <div><small>Duração</small><strong>{{ d.instance.durationMillis !== null ? (d.instance.durationMillis | duration) : 'em andamento' }}</strong></div>
+        <div><small>Etapa atual</small>
+          <strong>{{ d.activeTasks.length ? d.activeTasks.map(t => t.name).join(' + ') : (d.instance.status === 'RUNNING' ? 'Etapa automática' : 'Finalizado') }}</strong>
+        </div>
+      </div>
+    </section>
+
+    @if (d.request?.statusDetail || d.failures.length) {
+      <div class="failure fl-card">
+        <mat-icon>error</mat-icon>
+        <div>
+          <strong>Falha registrada pelo motor</strong>
+          <p>{{ d.request?.statusDetail ?? d.failures[0].message }}</p>
+        </div>
+      </div>
+    }
+
+    <mat-tab-group class="tabs" animationDuration="150ms" mat-stretch-tabs="false">
+      <mat-tab>
+        <ng-template mat-tab-label><mat-icon>info</mat-icon> Geral</ng-template>
+        <div class="tab general">
+          <div class="fl-card">
+            <div class="fl-card-header"><h3>Informações gerais</h3></div>
+            <dl class="info">
+              <div><dt>Processo</dt><dd>{{ d.instance.processDefinitionName }} (v{{ d.instance.processDefinitionVersion }})</dd></div>
+              <div><dt>Definição</dt><dd class="fl-mono">{{ d.instance.processDefinitionId }}</dd></div>
+              <div><dt>Instância</dt><dd class="fl-mono">{{ d.instance.id }}</dd></div>
+              <div><dt>businessKey</dt><dd class="fl-mono">{{ d.instance.businessKey }}</dd></div>
+              <div><dt>Iniciado por</dt><dd>{{ d.instance.startUserId ?? '—' }}</dd></div>
+              <div><dt>Encerramento</dt><dd>{{ d.instance.endTime ? (d.instance.endTime | date: 'dd/MM/yyyy HH:mm:ss') : '—' }}</dd></div>
+              @if (d.request; as req) {
+                <div><dt>Tipo</dt><dd>{{ req.typeLabel }}</dd></div>
+                @if (req.amount) {
+                  <div><dt>Valor</dt><dd>{{ req.amount | currency: 'BRL' }}</dd></div>
+                }
+                <div><dt>Resumo</dt><dd>{{ req.summary }}</dd></div>
+              }
+            </dl>
+          </div>
+          <div>
+            <h3 class="section">Tarefas pendentes</h3>
+            @for (task of d.activeTasks; track task.id) {
+              <fl-task-card [task]="task" [busy]="completion.busyTaskId() === task.id" [eligible]="isEligible(task)"
+                            (action)="run(task, $event)" />
+            } @empty {
+              <div class="fl-card">
+                <fl-empty-state icon="task_alt" title="Nenhuma tarefa humana pendente"
+                                [message]="d.instance.status === 'RUNNING' ? 'O processo está em uma etapa automática.' : 'O processo foi finalizado.'" />
+              </div>
+            }
+          </div>
+        </div>
+      </mat-tab>
+
+      <mat-tab>
+        <ng-template mat-tab-label><mat-icon>schema</mat-icon> Diagrama</ng-template>
+        <div class="tab">
+          <fl-bpmn-viewer [xml]="r.xml.value()" [state]="r.diagram.value()" [(selectedId)]="selectedElement" height="540px" />
+        </div>
+      </mat-tab>
+
+      <mat-tab>
+        <ng-template mat-tab-label><mat-icon>assignment</mat-icon> Tarefas</ng-template>
+        <div class="tab fl-card table-card">
+          <table mat-table [dataSource]="r.tasks.value() ?? []">
+            <ng-container matColumnDef="name">
+              <th mat-header-cell *matHeaderCellDef>Tarefa</th>
+              <td mat-cell *matCellDef="let t">
+                <strong>{{ t.name }}</strong>
+                <div class="fl-muted small">grupo: {{ t.candidateGroups.join(', ') || '—' }}</div>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="assignee">
+              <th mat-header-cell *matHeaderCellDef>Responsável</th>
+              <td mat-cell *matCellDef="let t">{{ t.assignee ?? '—' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="createdAt">
+              <th mat-header-cell *matHeaderCellDef>Criada</th>
+              <td mat-cell *matCellDef="let t">{{ t.createdAt | date: 'dd/MM HH:mm:ss' }}</td>
+            </ng-container>
+            <ng-container matColumnDef="endedAt">
+              <th mat-header-cell *matHeaderCellDef>Concluída</th>
+              <td mat-cell *matCellDef="let t">
+                @if (t.endedAt) { {{ t.endedAt | date: 'dd/MM HH:mm:ss' }} } @else { <fl-status-chip status="PENDING" /> }
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="duration">
+              <th mat-header-cell *matHeaderCellDef>Duração</th>
+              <td mat-cell *matCellDef="let t">{{ t.durationMillis | duration }}</td>
+            </ng-container>
+            <ng-container matColumnDef="decision">
+              <th mat-header-cell *matHeaderCellDef>Decisão</th>
+              <td mat-cell *matCellDef="let t">
+                @if (t.decision) {
+                  <span class="decision" [class]="'decision ' + t.decision.toLowerCase()">{{ actionLabel(t.decision) }}</span>
+                  @if (t.comment) { <div class="fl-muted small">“{{ t.comment }}”</div> }
+                } @else { — }
+              </td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="taskColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: taskColumns"></tr>
+          </table>
+        </div>
+      </mat-tab>
+
+      <mat-tab>
+        <ng-template mat-tab-label><mat-icon>data_object</mat-icon> Variáveis</ng-template>
+        <div class="tab fl-card table-card">
+          <table mat-table [dataSource]="r.variables.value() ?? []">
+            <ng-container matColumnDef="name">
+              <th mat-header-cell *matHeaderCellDef>Variável</th>
+              <td mat-cell *matCellDef="let v" class="fl-mono">{{ v.name }}</td>
+            </ng-container>
+            <ng-container matColumnDef="type">
+              <th mat-header-cell *matHeaderCellDef>Tipo</th>
+              <td mat-cell *matCellDef="let v"><span class="type">{{ v.type }}</span></td>
+            </ng-container>
+            <ng-container matColumnDef="value">
+              <th mat-header-cell *matHeaderCellDef>Valor</th>
+              <td mat-cell *matCellDef="let v">{{ isObject(v.value) ? (v.value | json) : v.value }}</td>
+            </ng-container>
+            <ng-container matColumnDef="lastUpdated">
+              <th mat-header-cell *matHeaderCellDef>Atualizada</th>
+              <td mat-cell *matCellDef="let v">{{ v.lastUpdated | date: 'dd/MM HH:mm:ss' }}</td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="variableColumns"></tr>
+            <tr mat-row *matRowDef="let row; columns: variableColumns"></tr>
+          </table>
+        </div>
+      </mat-tab>
+
+      <mat-tab>
+        <ng-template mat-tab-label><mat-icon>history</mat-icon> Histórico</ng-template>
+        <div class="tab history">
+          <div class="fl-card pad">
+            <fl-history-timeline [activities]="r.activities.value() ?? []" [instance]="d.instance"
+                                 [outcome]="r.outcome()" [(selectedId)]="selectedElement" />
+          </div>
+          <div class="fl-card pad sticky">
+            <fl-bpmn-viewer [xml]="r.xml.value()" [state]="r.diagram.value()" [(selectedId)]="selectedElement" height="520px" />
+          </div>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  }
+</div>

@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI"
+             typeLanguage="http://www.w3.org/2001/XMLSchema"
+             expressionLanguage="http://www.w3.org/1999/XPath"
+             targetNamespace="http://flowablelab.com/processes">
+
+  <process id="accessRequest" name="Solicitação de acesso" isExecutable="true">
+    <documentation>Pedido de acesso a sistema: aprovação do gestor seguida de provisionamento pela equipe de TI (múltiplas User Tasks com responsáveis diferentes).</documentation>
+
+    <startEvent id="start" name="Início" flowable:initiator="initiator"/>
+    <sequenceFlow id="flowStartToRegister" sourceRef="start" targetRef="registerRequest"/>
+
+    <serviceTask id="registerRequest" name="Solicitar acesso" flowable:delegateExpression="${registerRequestDelegate}"/>
+    <sequenceFlow id="flowRegisterToReview" sourceRef="registerRequest" targetRef="managerReview"/>
+
+    <userTask id="managerReview" name="Análise do gestor" flowable:candidateGroups="gestor">
+      <documentation>O gestor avalia a necessidade do acesso.</documentation>
+    </userTask>
+    <sequenceFlow id="flowReviewToDecision" sourceRef="managerReview" targetRef="decisionGateway"/>
+
+    <exclusiveGateway id="decisionGateway" name="Aprovado?"/>
+    <sequenceFlow id="flowApproved" name="Aprovado" sourceRef="decisionGateway" targetRef="itProvisioning">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${approved}]]></conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flowRejected" name="Rejeitado" sourceRef="decisionGateway" targetRef="endRejected">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${!approved}]]></conditionExpression>
+    </sequenceFlow>
+
+    <userTask id="itProvisioning" name="Tarefa TI" flowable:candidateGroups="ti">
+      <documentation>A equipe de TI provisiona o acesso e conclui a tarefa.</documentation>
+    </userTask>
+    <sequenceFlow id="flowItToGrant" sourceRef="itProvisioning" targetRef="grantAccess"/>
+
+    <serviceTask id="grantAccess" name="Conceder acesso" flowable:delegateExpression="${grantAccessDelegate}"/>
+    <sequenceFlow id="flowGrantToEnd" sourceRef="grantAccess" targetRef="endApproved"/>
+
+    <endEvent id="endApproved" name="Fim (concedido)">
+      <extensionElements>
+        <flowable:executionListener event="start" expression="${requestOutcome.record(execution, 'APPROVED')}"/>
+      </extensionElements>
+    </endEvent>
+    <endEvent id="endRejected" name="Fim (rejeitado)">
+      <extensionElements>
+        <flowable:executionListener event="start" expression="${requestOutcome.record(execution, 'REJECTED')}"/>
+      </extensionElements>
+    </endEvent>
+  </process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_accessRequest">
+    <bpmndi:BPMNPlane id="BPMNPlane_accessRequest" bpmnElement="accessRequest">
+      <bpmndi:BPMNShape id="start_di" bpmnElement="start">
+        <omgdc:Bounds x="60" y="182" width="36" height="36"/>
+        <bpmndi:BPMNLabel><omgdc:Bounds x="62" y="225" width="32" height="14"/></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="registerRequest_di" bpmnElement="registerRequest">
+        <omgdc:Bounds x="150" y="160" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="managerReview_di" bpmnElement="managerReview">
+        <omgdc:Bounds x="320" y="160" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="decisionGateway_di" bpmnElement="decisionGateway" isMarkerVisible="true">
+        <omgdc:Bounds x="495" y="175" width="50" height="50"/>
+        <bpmndi:BPMNLabel><omgdc:Bounds x="492" y="152" width="56" height="14"/></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="itProvisioning_di" bpmnElement="itProvisioning">
+        <omgdc:Bounds x="620" y="160" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="grantAccess_di" bpmnElement="grantAccess">
+        <omgdc:Bounds x="790" y="160" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="endApproved_di" bpmnElement="endApproved">
+        <omgdc:Bounds x="962" y="182" width="36" height="36"/>
+        <bpmndi:BPMNLabel><omgdc:Bounds x="940" y="225" width="80" height="14"/></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="endRejected_di" bpmnElement="endRejected">
+        <omgdc:Bounds x="662" y="302" width="36" height="36"/>
+        <bpmndi:BPMNLabel><omgdc:Bounds x="640" y="345" width="80" height="14"/></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge id="flowStartToRegister_di" bpmnElement="flowStartToRegister">
+        <omgdi:waypoint x="96" y="200"/><omgdi:waypoint x="150" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flowRegisterToReview_di" bpmnElement="flowRegisterToReview">
+        <omgdi:waypoint x="270" y="200"/><omgdi:waypoint x="320" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flowReviewToDecision_di" bpmnElement="flowReviewToDecision">
+        <omgdi:waypoint x="440" y="200"/><omgdi:waypoint x="495" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flowApproved_di" bpmnElement="flowApproved">
+        <omgdi:waypoint x="545" y="200"/><omgdi:waypoint x="620" y="200"/>
+        <bpmndi:BPMNLabel><omgdc:Bounds x="555" y="180" width="56" height="14"/></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flowRejected_di" bpmnElement="flowRejected">
+        <omgdi:waypoint x="520" y="225"/><omgdi:waypoint x="520" y="320"/><omgdi:waypoint x="662" y="320"/>
+        <bpmndi:BPMNLabel><omgdc:Bounds x="534" y="326" width="56" height="14"/></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flowItToGrant_di" bpmnElement="flowItToGrant">
+        <omgdi:waypoint x="740" y="200"/><omgdi:waypoint x="790" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flowGrantToEnd_di" bpmnElement="flowGrantToEnd">
+        <omgdi:waypoint x="910" y="200"/><omgdi:waypoint x="962" y="200"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>

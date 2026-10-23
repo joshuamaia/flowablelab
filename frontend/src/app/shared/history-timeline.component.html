@@ -1,0 +1,69 @@
+@if (instance(); as inst) {
+  <div class="summary">
+    <div>
+      <span class="fl-muted">Início</span>
+      <strong>{{ inst.startTime | date: 'dd/MM/yyyy HH:mm:ss' }}</strong>
+      @if (inst.startUserId) {
+        <span class="fl-muted">por {{ inst.startUserId }}</span>
+      }
+    </div>
+    <div>
+      <span class="fl-muted">Fim</span>
+      <strong>{{ inst.endTime ? (inst.endTime | date: 'dd/MM/yyyy HH:mm:ss') : 'em andamento' }}</strong>
+    </div>
+    <div>
+      <span class="fl-muted">Duração total</span>
+      <strong>{{ inst.durationMillis !== null ? (inst.durationMillis | duration) : '—' }}</strong>
+    </div>
+    @if (outcome()) {
+      <div>
+        <span class="fl-muted">Resultado final</span>
+        <strong>{{ outcome() }}</strong>
+      </div>
+    }
+  </div>
+}
+
+<ol class="timeline">
+  @for (item of items(); track item.id) {
+    <li
+      [class.active]="item.status === 'ACTIVE'"
+      [class.selected]="item.activityId === selectedId()"
+      (click)="select(item)"
+      (keydown.enter)="select(item)"
+      tabindex="0"
+      [attr.aria-label]="'Destacar ' + (item.name || item.activityId) + ' no diagrama'"
+    >
+      <span class="marker" [class]="'marker ' + item.status.toLowerCase()">
+        <mat-icon>{{ icons[item.type] ?? 'radio_button_checked' }}</mat-icon>
+      </span>
+      <div class="content">
+        <div class="title">
+          <strong>{{ item.name || item.activityId }}</strong>
+          <small>{{ typeLabels[item.type] ?? item.type }}</small>
+        </div>
+        <div class="meta">
+          <span><mat-icon>schedule</mat-icon>{{ item.startTime | date: 'dd/MM HH:mm:ss' }}</span>
+          @if (item.endTime) {
+            <span><mat-icon>timer</mat-icon>{{ item.durationMillis | duration }}</span>
+          } @else {
+            <span class="running"><mat-icon>hourglass_top</mat-icon>em andamento</span>
+          }
+          @if (item.assignee) {
+            <span><mat-icon>person</mat-icon>{{ item.assignee }}</span>
+          }
+        </div>
+        @if (item.decision) {
+          <div class="decision" [class]="'decision ' + item.decision.toLowerCase()">
+            {{ actionLabels[item.decision] }}
+            @if (item.comment) {
+              <span>— “{{ item.comment }}”</span>
+            }
+          </div>
+        }
+      </div>
+    </li>
+  } @empty {
+    <li class="empty">Nenhuma atividade registrada.</li>
+  }
+</ol>

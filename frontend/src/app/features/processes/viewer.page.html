@@ -1,0 +1,74 @@
+<div class="fl-page">
+  <fl-page-header
+    title="Visualizador BPMN"
+    subtitle="Diagramas renderizados com bpmn-js a partir do XML implantado no Flowable, destacando o caminho realmente executado."
+  >
+    @if (instance()) {
+      <a mat-stroked-button [routerLink]="['/history']" [queryParams]="{ instance: instance() }">
+        <mat-icon>history</mat-icon> Histórico
+      </a>
+      <a mat-flat-button [routerLink]="['/instances', instance()]"><mat-icon>open_in_new</mat-icon> Detalhes</a>
+    }
+  </fl-page-header>
+
+  <section class="fl-card selector">
+    <div>
+      <h3>Instância em execução ou finalizada</h3>
+      <fl-instance-picker [selected]="instance() ?? null" (selectedChange)="selectInstance($event)" />
+    </div>
+    <div>
+      <h3>Somente a definição</h3>
+      <div class="defs">
+        @for (o of definitionOptions(); track o.meta.key) {
+          <button
+            mat-stroked-button
+            [class.active]="definition() === o.def!.id"
+            (click)="selectDefinition(o.def!.id)"
+          >
+            <mat-icon [style.color]="o.meta.color">{{ o.meta.icon }}</mat-icon>
+            {{ o.meta.title }} <small>v{{ o.def!.version }}</small>
+          </button>
+        }
+      </div>
+    </div>
+  </section>
+
+  @if (mode() === 'none') {
+    <div class="fl-card hint">
+      <mat-icon>schema</mat-icon>
+      <p>Selecione uma instância para visualizar o caminho percorrido, ou uma definição para ver o fluxo completo.</p>
+    </div>
+  } @else {
+    <section class="fl-card diagram">
+      <div class="fl-card-header">
+        @if (mode() === 'instance') {
+          @let d = resources.details.value();
+          <h2>
+            {{ d?.instance?.processDefinitionName }}
+            <span class="fl-mono fl-muted">{{ d?.instance?.businessKey }}</span>
+          </h2>
+          <div class="counters">
+            @if (d?.request) {
+              <fl-status-chip [status]="d!.request!.status" />
+            } @else if (d) {
+              <fl-status-chip [status]="d.instance.status" />
+            }
+            <span class="c active">{{ counters().active }} ativa(s)</span>
+            <span class="c completed">{{ counters().completed }} concluída(s)</span>
+            @if (counters().failed) {
+              <span class="c failed">{{ counters().failed }} com falha</span>
+            }
+          </div>
+        } @else {
+          <h2>Definição <span class="fl-mono fl-muted">{{ definition() }}</span></h2>
+        }
+      </div>
+      <div class="body">
+        <fl-bpmn-viewer [xml]="xml()" [state]="state()" [(selectedId)]="selectedElement" height="560px" />
+        <p class="tip fl-muted">
+          <mat-icon>touch_app</mat-icon> Clique em um elemento para ver os detalhes · arraste para mover · use os botões para zoom.
+        </p>
+      </div>
+    </section>
+  }
+</div>

@@ -1,0 +1,43 @@
+<div class="fl-page">
+  <fl-page-header
+    title="Catálogo de processos"
+    subtitle="Quatro workflows BPMN 2.0 implantados no Flowable. Escolha um para abrir uma solicitação real."
+  />
+
+  <section class="grid">
+    @for (card of cards(); track card.meta.key) {
+      <article class="fl-card card">
+        <div class="banner" [style.background]="card.meta.soft">
+          <span class="icon" [style.background]="card.meta.color"><mat-icon>{{ card.meta.icon }}</mat-icon></span>
+          @if (card.definition; as def) {
+            <span class="version">v{{ def.version }}</span>
+          }
+        </div>
+        <div class="body">
+          <h2>{{ card.meta.title }}</h2>
+          <p>{{ card.meta.description }}</p>
+          <div class="features">
+            @for (f of card.meta.features; track f) {
+              <span>{{ f }}</span>
+            }
+          </div>
+          <div class="stats">
+            <span><strong>{{ card.stats?.running ?? 0 }}</strong> em andamento</span>
+            <span><strong>{{ card.stats?.completed ?? 0 }}</strong> concluídos</span>
+          </div>
+        </div>
+        <div class="actions">
+          @if (card.definition; as def) {
+            <a mat-button [routerLink]="['/viewer']" [queryParams]="{ definition: def.id }">
+              <mat-icon>schema</mat-icon> Ver BPMN
+            </a>
+          }
+          <span class="fl-spacer"></span>
+          <button mat-flat-button (click)="start(card.meta)" [disabled]="!card.definition">
+            <mat-icon>play_arrow</mat-icon> Iniciar
+          </button>
+        </div>
+      </article>
+    }
+  </section>
+</div>

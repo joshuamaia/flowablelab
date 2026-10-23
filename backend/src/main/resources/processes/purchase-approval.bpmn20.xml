@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI"
+             typeLanguage="http://www.w3.org/2001/XMLSchema"
+             expressionLanguage="http://www.w3.org/1999/XPath"
+             targetNamespace="http://flowablelab.com/processes">
+
+  <process id="purchaseApproval" name="Aprovação de compra" isExecutable="true">
+    <documentation>Solicitação de compra com validação automática (Service Task), análise do gestor (User Task) e decisão por Exclusive Gateway.</documentation>
+
+    <startEvent id="start" name="Início" flowable:initiator="initiator"/>
+    <sequenceFlow id="flowStartToRegister" sourceRef="start" targetRef="registerRequest"/>
+
+    <serviceTask id="registerRequest" name="Registrar solicitação" flowable:delegateExpression="${registerRequestDelegate}"/>
+    <sequenceFlow id="flowRegisterToValidation" sourceRef="registerRequest" targetRef="automaticValidation"/>
+
+    <serviceTask id="automaticValidation" name="Validação automática" flowable:delegateExpression="${purchaseValidationDelegate}"/>
+    <sequenceFlow id="flowValidationToReview" sourceRef="automaticValidation" targetRef="managerReview"/>
+
+    <userTask id="managerReview" name="Análise do gestor" flowable:candidateGroups="gestor">
+      <documentation>Aprovar ou rejeitar a compra. A rejeição exige justificativa.</documentation>
+    </userTask>
+    <sequenceFlow id="flowReviewToDecision" sourceRef="managerReview" targetRef="decisionGateway"/>
+
+    <exclusiveGateway id="decisionGateway" name="Aprovado?"/>
+    <sequenceFlow id="flowApproved" name="Aprovado" sourceRef="decisionGateway" targetRef="purchaseApproved">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${approved}]]></conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flowRejected" name="Rejeitado" sourceRef="decisionGateway" targetRef="purchaseRejected">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${!approved}]]></conditionExpression>
+    </sequenceFlow>
+
+    <serviceTask id="purchaseApproved" name="Compra aprovada" flowable:delegateExpression="${purchaseOrderDelegate}"/>
+    <sequenceFlow id="flowApprovedToEnd" sourceRef="purchaseApproved" targetRef="endApproved"/>
+
+    <serviceTask id="purchaseRejected" name="Compra rejeitada" flowable:delegateExpression="${purchaseRejectionDelegate}"/>
+    <sequenceFlow id="flowRejectedToEnd" sourceRef="purchaseRejected" targetRef="endRejected"/>
+
+    <endEvent id="endApproved" name="Fim (aprovada)">
+      <extensionElements>
+        <flowable:executionListener event="start" expression="${requestOutcome.record(execution, 'APPROVED')}"/>
+      </extensionElements>
+    </endEvent>
+    <endEvent id="endRejected" name="Fim (rejeitada)">
+      <extensionElements>
+        <flowable:executionListener event="start" expression="${requestOutcome.record(execution, 'REJECTED')}"/>
+      </extensionElements>
+    </endEvent>
+  </process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_purchaseApproval">
+    <bpmndi:BPMNPlane id="BPMNPlane_purchaseApproval" bpmnElement="purchaseApproval">
+      <bpmndi:BPMNShape id="start_di" bpmnElement="start">
+        <omgdc:Bounds x="60" y="182" width="36" height="36"/>
+        <bpmndi:BPMNLabel><omgdc:Bounds x="62" y="225" width="32" height="14"/></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="registerRequest_di" bpmnElement="registerRequest">
+        <omgdc:Bounds x="150" y="160" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="automaticValidation_di" bpmnElement="automaticValidation">
+        <omgdc:Bounds x="320" y="160" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="managerReview_di" bpmnElement="managerReview">
+        <omgdc:Bounds x="490" y="160" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="decisionGateway_di" bpmnElement="decisionGateway" isMarkerVisible="true">
+        <omgdc:Bounds x="665" y="175" width="50" height="50"/>
+        <bpmndi:BPMNLabel><omgdc:Bounds x="722" y="193" width="56" height="14"/></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="purchaseApproved_di" bpmnElement="purchaseApproved">
+        <omgdc:Bounds x="790" y="80" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="purchaseRejected_di" bpmnElement="purchaseRejected">
+        <omgdc:Bounds x="790" y="240" width="120" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="endApproved_di" bpmnElement="endApproved">
+        <omgdc:Bounds x="972" y="102" width="36" height="36"/>
+        <bpmndi:BPMNLabel><omgdc:Bounds x="950" y="145" width="80" height="14"/></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="endRejected_di" bpmnElement="endRejected">
+        <omgdc:Bounds x="972" y="262" width="36" height="36"/>
+        <bpmndi:BPMNLabel><omgdc:Bounds x="950" y="305" width="80" height="14"/></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge id="flowStartToRegister_di" bpmnElement="flowStartToRegister">
+        <omgdi:waypoint x="96" y="200"/><omgdi:waypoint x="150" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flowRegisterToValidation_di" bpmnElement="flowRegisterToValidation">
+        <omgdi:waypoint x="270" y="200"/><omgdi:waypoint x="320" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flowValidationToReview_di" bpmnElement="flowValidationToReview">
+        <omgdi:waypoint x="440" y="200"/><omgdi:waypoint x="490" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flowReviewToDecision_di" bpmnElement="flowReviewToDecision">
+        <omgdi:waypoint x="610" y="200"/><omgdi:waypoint x="665" y="200"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flowApproved_di" bpmnElement="flowApproved">
+        <omgdi:waypoint x="690" y="175"/><omgdi:waypoint x="690" y="120"/><omgdi:waypoint x="790" y="120"/>
+        <bpmndi:BPMNLabel><omgdc:Bounds x="704" y="100" width="56" height="14"/></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flowRejected_di" bpmnElement="flowRejected">
+        <omgdi:waypoint x="690" y="225"/><omgdi:waypoint x="690" y="280"/><omgdi:waypoint x="790" y="280"/>
+        <bpmndi:BPMNLabel><omgdc:Bounds x="704" y="286" width="56" height="14"/></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flowApprovedToEnd_di" bpmnElement="flowApprovedToEnd">
+        <omgdi:waypoint x="910" y="120"/><omgdi:waypoint x="972" y="120"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="flowRejectedToEnd_di" bpmnElement="flowRejectedToEnd">
+        <omgdi:waypoint x="910" y="280"/><omgdi:waypoint x="972" y="280"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>

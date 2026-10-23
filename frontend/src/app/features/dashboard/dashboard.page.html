@@ -1,0 +1,84 @@
+<div class="fl-page">
+  <fl-page-header
+    [title]="'Olá, ' + users.profile().name.split(' ')[0] + ' 👋'"
+    subtitle="Indicadores calculados em tempo real a partir do motor Flowable e das solicitações de negócio."
+  >
+    <button mat-stroked-button (click)="reload()"><mat-icon>refresh</mat-icon> Atualizar</button>
+    <a mat-flat-button routerLink="/processes"><mat-icon>add</mat-icon> Nova solicitação</a>
+  </fl-page-header>
+
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" class="loading" />
+  }
+
+  @if (error(); as message) {
+    <div class="fl-card error">
+      <mat-icon>cloud_off</mat-icon>
+      <span>{{ message }}</span>
+    </div>
+  }
+
+  @let s = summary.value();
+  <section class="kpis">
+    <fl-kpi-card label="Processos iniciados" [value]="s?.started ?? null" icon="rocket_launch" />
+    <fl-kpi-card label="Em andamento" [value]="s?.running ?? null" icon="autorenew" color="#2f6bff" soft="#e6eeff" />
+    <fl-kpi-card label="Concluídos" [value]="s?.completed ?? null" icon="flag" color="#0f766e" soft="#dcf5f1" />
+    <fl-kpi-card label="Tarefas pendentes" [value]="s?.pendingTasks ?? null" icon="pending_actions" color="#d97706" soft="#fff3df" />
+    <fl-kpi-card label="Aprovações" [value]="s?.approved ?? null" icon="thumb_up" color="#16a34a" soft="#e3f6ea" />
+    <fl-kpi-card label="Rejeições" [value]="s?.rejected ?? null" icon="thumb_down" color="#e11d48" soft="#ffe4ea"
+                 [hint]="s && s.failed ? s.failed + ' com falha técnica' : undefined" />
+  </section>
+
+  <section class="charts">
+    <div class="fl-card">
+      <div class="fl-card-header"><h2>Solicitações por status</h2></div>
+      <div class="chart-body">
+        @if (statusChart(); as config) {
+          <fl-chart [config]="config" />
+        }
+      </div>
+    </div>
+    <div class="fl-card">
+      <div class="fl-card-header"><h2>Instâncias por tipo de processo</h2></div>
+      <div class="chart-body">
+        @if (typeChart(); as config) {
+          <fl-chart [config]="config" />
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="fl-card recent">
+    <div class="fl-card-header">
+      <h2>Solicitações recentes</h2>
+      <a mat-button routerLink="/requests">Ver todas <mat-icon iconPositionEnd>arrow_forward</mat-icon></a>
+    </div>
+    <div class="recent-list">
+      @for (r of recent.value()?.content ?? []; track r.id) {
+        @let meta = processMeta(r.processKey);
+        <a class="recent-item" [routerLink]="['/instances', r.processInstanceId]">
+          <span class="icon" [style.background]="meta.soft" [style.color]="meta.color">
+            <mat-icon>{{ meta.icon }}</mat-icon>
+          </span>
+          <span class="info">
+            <strong>{{ r.summary }}</strong>
+            <small>{{ r.number }} · {{ r.typeLabel }} · {{ r.requester }} · {{ r.openedAt | date: 'dd/MM HH:mm' }}</small>
+          </span>
+          @if (r.amount) {
+            <span class="amount">{{ r.amount | currency: 'BRL' }}</span>
+          }
+          <span class="step">
+            @if (r.currentSteps.length) {
+              <mat-icon>arrow_right_alt</mat-icon>{{ r.currentSteps.join(' + ') }}
+            }
+          </span>
+          <fl-status-chip [status]="r.status" />
+        </a>
+      } @empty {
+        @if (!recent.isLoading()) {
+          <fl-empty-state title="Nenhuma solicitação ainda" message="Inicie um processo no catálogo." icon="inbox" />
+        }
+      }
+    </div>
+  </section>
+</div>

@@ -1,0 +1,84 @@
+<mat-sidenav-container class="container">
+  <mat-sidenav
+    #drawer
+    class="sidenav"
+    [mode]="isMobile() ? 'over' : 'side'"
+    [opened]="!isMobile()"
+  >
+    <a class="brand" routerLink="/">
+      <img src="favicon.svg" alt="" width="36" height="36" />
+      <div>
+        <strong>FlowableLab</strong>
+        <span>BPMN 2.0 · Flowable OSS</span>
+      </div>
+    </a>
+
+    <nav>
+      @for (item of nav; track item.path) {
+        <a
+          class="nav-item"
+          [routerLink]="item.path"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: !!item.exact }"
+          (click)="isMobile() && drawer.close()"
+        >
+          <mat-icon>{{ item.icon }}</mat-icon>
+          <span>{{ item.label }}</span>
+          @if (item.path === '/tasks' && pendingCount()) {
+            <span class="badge">{{ pendingCount() }}</span>
+          }
+        </a>
+      }
+    </nav>
+
+    <div class="engine-card">
+      <mat-icon>bolt</mat-icon>
+      <div>
+        <strong>Motor real</strong>
+        <span>Flowable Open Source incorporado ao Spring Boot</span>
+      </div>
+      <a mat-stroked-button href="/swagger-ui.html" target="_blank" rel="noopener">
+        <mat-icon>api</mat-icon> Swagger
+      </a>
+    </div>
+  </mat-sidenav>
+
+  <mat-sidenav-content>
+    <mat-toolbar class="toolbar">
+      @if (isMobile()) {
+        <button mat-icon-button (click)="drawer.toggle()" aria-label="Abrir menu"><mat-icon>menu</mat-icon></button>
+      }
+      <span class="demo-tag" matTooltip="Perfis apenas demonstrativos — não há autenticação">
+        <mat-icon>science</mat-icon> Ambiente demonstrativo
+      </span>
+      <span class="fl-spacer"></span>
+
+      <span class="last-refresh">Atualizado às {{ refresh.lastRefresh() | date: 'HH:mm:ss' }}</span>
+      <button mat-icon-button matTooltip="Atualizar dados" aria-label="Atualizar dados" (click)="refresh.bump()">
+        <mat-icon>refresh</mat-icon>
+      </button>
+
+      <button class="user" [matMenuTriggerFor]="userMenu" aria-label="Trocar perfil demonstrativo">
+        <span class="avatar"><mat-icon>{{ users.profile().icon }}</mat-icon></span>
+        <span class="who">
+          <strong>{{ users.profile().name }}</strong>
+          <small>{{ users.profile().role }}</small>
+        </span>
+        <mat-icon>expand_more</mat-icon>
+      </button>
+      <mat-menu #userMenu="matMenu" xPosition="before">
+        <div class="menu-hint" mat-menu-item disabled>Atuar como…</div>
+        @for (p of profiles; track p.id) {
+          <button mat-menu-item (click)="selectUser(p.id)">
+            <mat-icon>{{ users.userId() === p.id ? 'radio_button_checked' : p.icon }}</mat-icon>
+            <span>{{ p.name }} <small class="fl-muted">· {{ p.role }}</small></span>
+          </button>
+        }
+      </mat-menu>
+    </mat-toolbar>
+
+    <main>
+      <router-outlet />
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>

@@ -1,0 +1,117 @@
+### Exemplos de requisições REST do FlowableLab
+### Use com a extensão "REST Client" (VS Code) ou IntelliJ HTTP Client.
+### O cabeçalho X-Demo-User apenas simula perfis (colaborador, gestor, ti) — NÃO é autenticação.
+
+@api = http://localhost:8080/api
+
+### Definições implantadas (última versão)
+GET {{api}}/process-definitions
+
+### XML BPMN exato de uma definição (substitua o id)
+GET {{api}}/process-definitions/purchaseApproval:1:<deploymentId>/diagram
+
+### Iniciar: aprovação de compra
+POST {{api}}/process-instances
+Content-Type: application/json
+X-Demo-User: colaborador
+
+{
+  "processKey": "purchaseApproval",
+  "requester": "Ana Souza",
+  "description": "Notebooks para a equipe de dados",
+  "amount": 18500.00,
+  "justification": "Renovação do parque de equipamentos"
+}
+
+### Iniciar: férias
+POST {{api}}/process-instances
+Content-Type: application/json
+X-Demo-User: colaborador
+
+{
+  "processKey": "vacationApproval",
+  "requester": "Bruno Lima",
+  "startDate": "2027-01-10",
+  "endDate": "2027-01-24",
+  "notes": "Viagem em família"
+}
+
+### Iniciar: acesso
+POST {{api}}/process-instances
+Content-Type: application/json
+X-Demo-User: colaborador
+
+{
+  "processKey": "accessRequest",
+  "requester": "Carla Mendes",
+  "system": "ERP Financeiro",
+  "accessLevel": "ESCRITA",
+  "justification": "Fechamento contábil mensal"
+}
+
+### Iniciar: aprovação paralela
+POST {{api}}/process-instances
+Content-Type: application/json
+X-Demo-User: colaborador
+
+{
+  "processKey": "parallelApproval",
+  "requester": "Diego Rocha",
+  "title": "Migração para nuvem",
+  "description": "Migrar o ambiente de homologação",
+  "estimatedAmount": 75000.00
+}
+
+### Tarefas pendentes do gestor
+GET {{api}}/tasks?assignee=gestor&status=PENDING
+
+### Tarefas concluídas pela TI no processo de acesso
+GET {{api}}/tasks?assignee=ti&status=COMPLETED&processKey=accessRequest
+
+### Aprovar
+POST {{api}}/tasks/<taskId>/complete
+Content-Type: application/json
+X-Demo-User: gestor
+
+{ "action": "APPROVE", "comment": "Dentro do orçamento" }
+
+### Rejeitar (justificativa obrigatória)
+POST {{api}}/tasks/<taskId>/complete
+Content-Type: application/json
+X-Demo-User: gestor
+
+{ "action": "REJECT", "comment": "Fora da política de compras" }
+
+### Concluir tarefa sem decisão (Tarefa TI, Abrir solicitação)
+POST {{api}}/tasks/<taskId>/complete
+Content-Type: application/json
+X-Demo-User: ti
+
+{ "action": "COMPLETE", "comment": "Usuário criado" }
+
+### Instâncias em andamento
+GET {{api}}/process-instances?finished=false&page=0&size=20
+
+### Detalhes, estado do diagrama e variáveis
+GET {{api}}/process-instances/<processInstanceId>
+###
+GET {{api}}/process-instances/<processInstanceId>/activities
+###
+GET {{api}}/process-instances/<processInstanceId>/variables
+
+### Histórico
+GET {{api}}/history/processes/<processInstanceId>
+###
+GET {{api}}/history/processes/<processInstanceId>/activities
+###
+GET {{api}}/history/processes/<processInstanceId>/tasks
+
+### Solicitações (filtros, paginação e ordenação)
+GET {{api}}/requests?status=IN_PROGRESS&type=PURCHASE&sort=openedAt&direction=desc&page=0&size=10
+
+### Dashboard
+GET {{api}}/dashboard/summary
+###
+GET {{api}}/dashboard/process-status
+###
+GET {{api}}/dashboard/process-types
