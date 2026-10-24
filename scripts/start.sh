@@ -9,4 +9,4 @@ docker compose up --build -d --wait
 echo
 echo "FlowableLab em execução:"
 echo "  Interface:  http://localhost:${FRONTEND_PORT:-4200}"
-echo "  Swagger:    http://localhost:${BACKEND_PORT:-8080}/swagger-ui.html"
+echo "  Swagger:    http://localhost:${FRONTEND_PORT:-4200}/swagger-ui.html"

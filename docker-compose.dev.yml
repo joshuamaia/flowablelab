@@ -1,0 +1,18 @@
+# Sobreposição para DESENVOLVIMENTO: publica BFF, backend e PostgreSQL no host.
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
+#
+# Útil para `ng serve` (proxy -> BFF em :3000), Swagger direto no backend, testes manuais
+# do BFF e ferramentas de banco. Não use em ambientes compartilhados.
+
+services:
+  postgres:
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+
+  backend:
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+
+  bff:
+    ports:
+      - "${BFF_PORT:-3000}:3000"

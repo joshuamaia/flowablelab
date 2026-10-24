@@ -13,4 +13,4 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Host ''
 Write-Host 'FlowableLab em execução:'
 Write-Host '  Interface:  http://localhost:4200'
-Write-Host '  Swagger:    http://localhost:8080/swagger-ui.html'
+Write-Host '  Swagger:    http://localhost:4200/swagger-ui.html'

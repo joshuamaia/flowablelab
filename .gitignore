@@ -19,3 +19,8 @@ frontend/coverage/
 .DS_Store
 Thumbs.db
 *.log
+
+# BFF (NestJS)
+bff/node_modules/
+bff/dist/
+bff/coverage/

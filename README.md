@@ -10,6 +10,7 @@
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0.9-6DB33F?logo=springboot&logoColor=white)
 ![Flowable](https://img.shields.io/badge/Flowable%20OSS-8.0.0-1F6FEB)
 ![Angular](https://img.shields.io/badge/Angular-22-DD0031?logo=angular&logoColor=white)
+![NestJS](https://img.shields.io/badge/NestJS%20BFF-11.2-E0234E?logo=nestjs&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker%20Compose-1%20comando-2496ED?logo=docker&logoColor=white)
 ![Licença](https://img.shields.io/badge/licença-MIT-green)
@@ -43,7 +44,7 @@
 19. [Como limpar os dados demonstrativos](#19-como-limpar-os-dados-demonstrativos)
 20. [Limitações de segurança do MVP](#20-limitações-de-segurança-do-mvp)
 
-Extras: [os quatro workflows](#os-quatro-workflows) · [API REST](#api-rest) · [tratamento de erros](#tratamento-de-erros) · [solução de problemas](#solução-de-problemas)
+Extras: [BFF NestJS](#bff-nestjs) · [os quatro workflows](#os-quatro-workflows) · [API REST](#api-rest) · [tratamento de erros](#tratamento-de-erros) · [solução de problemas](#solução-de-problemas)
 
 ---
 
@@ -99,7 +100,8 @@ Elementos usados no FlowableLab:
 
 As versões foram escolhidas pela **compatibilidade oficial**: o Flowable 8.0.0 é compilado contra
 Spring Boot 4.0.x (Spring Framework 7, Jackson 3) e suporta Java 17+. Por isso o backend usa a última
-versão da linha **4.0**, e não a 4.1.
+versão da linha **4.0**, e não a 4.1. O BFF usa o **NestJS 11.2** (CommonJS, compatível com Jest/ts-jest):
+o NestJS 12 passou a ser distribuído apenas como ESM e é muito recente.
 
 | Camada | Tecnologia | Versão |
 |---|---|---|
@@ -116,35 +118,52 @@ versão da linha **4.0**, e não a 4.1.
 | | bpmn-js (NavigatedViewer) | 18.x |
 | | Chart.js | 4.6 |
 | | TypeScript · RxJS · SCSS · Vitest | 6.0 · 7.8 · — · 5 |
+| BFF | NestJS (platform-express / Express 5) | 11.2 |
+| | Node.js (LTS) · TypeScript | 24 · 5.9 |
+| | Jest · ts-jest · Supertest | 30 · 29 · 7 |
 | Infra | PostgreSQL | 17.6 (alpine) |
 | | Nginx | 1.29 (alpine) |
 | | Docker Compose · GitHub Actions | — |
 
 ## 5. Arquitetura da aplicação
 
-```text
-                   USUÁRIO
-                      |
-                      v
-               ANGULAR + NGINX            SPA + proxy de /api, /swagger-ui, /v3/api-docs
-                 porta 4200
-                      |  REST
-                      v
-                 SPRING BOOT               interfaces → application → domain
-                 porta 8080                         ↘ infrastructure (adaptadores)
-                      |
-          +-----------+-----------+
-          |                       |
-          v                       v
-    CASOS DE USO            FLOWABLE ENGINE   (incorporado, mesmo processo Java)
-    REGRAS DE NEGÓCIO       BPMN 2.0
-          |                       |
-          +-----------+-----------+   mesma transação Spring
-                      |
-                      v
-                  POSTGRESQL               schema public: ACT_* (Flowable)
-                  porta 5433 (host)        schema business: tabelas de negócio (Flyway)
+**Angular → NestJS (BFF) → Spring Boot + Flowable → PostgreSQL**
+
+```mermaid
+flowchart TB
+    U([Navegador]) -- "http://localhost:4200" --> NG
+
+    subgraph FE["frontend · Angular 22 + Nginx (único serviço publicado)"]
+        NG["Nginx<br/>SPA + proxy de /api, /swagger-ui, /v3/api-docs"]
+    end
+
+    NG -- "http://bff:3000" --> BFF
+
+    subgraph BF["bff · NestJS 11 (rede interna, :3000)"]
+        BFF["Proxy HTTP transparente<br/>correlação · logs JSON · timeout · 502/504"]
+    end
+
+    BFF -- "BACKEND_URL=http://backend:8080" --> API
+
+    subgraph BE["backend · Spring Boot 4 + Java 25 (rede interna, :8080)"]
+        API[interfaces · REST + Problem Details]
+        APP[application · casos de uso]
+        DOM[domain · regras de negócio]
+        ENG[[Flowable Engine incorporado]]
+        API --> APP --> DOM
+        APP --> ENG
+    end
+
+    ENG -- "jdbc:postgresql://postgres:5432" --> DB[(PostgreSQL 17<br/>public: ACT_* · business: negócio)]
 ```
+
+| Camada | Responsabilidade | Não faz |
+|---|---|---|
+| **Angular** (`frontend/`) | Telas, formulários, estado com Signals, visualizador bpmn-js. Chama apenas `/api` na própria origem. | Não conhece o endereço do BFF nem do backend |
+| **Nginx** (`frontend/nginx.conf`) | Serve o build do Angular e encaminha `/api`, `/swagger-ui` e `/v3/api-docs` ao BFF | Não fala com o backend |
+| **BFF NestJS** (`bff/`) | Proxy transparente para o Spring Boot: preserva métodos, paths, query strings, corpos, cabeçalhos e status; adiciona `X-Correlation-Id`, logs estruturados, timeout e respostas 502/504 | Não contém regra de negócio, não acessa o Flowable nem o banco, não reenvia requisições |
+| **Spring Boot + Flowable** (`backend/`) | Regras de negócio, validação de perfis, execução dos workflows BPMN | — (inalterado em relação à V1) |
+| **PostgreSQL** | Tabelas do Flowable (`public`) e de negócio (`business`) | — |
 
 **Arquitetura hexagonal** no backend:
 
@@ -180,13 +199,28 @@ flowablelab/
 │   │   ├── shared/                  bpmn-viewer, timeline, cards, chips, gráficos
 │   │   ├── layout/                  menu lateral + cabeçalho com seletor de perfil
 │   │   └── features/                dashboard, processes, requests, tasks, history
-│   ├── nginx.conf                   SPA + proxy para o backend
+│   ├── nginx.conf                   SPA + proxy para o BFF
+│   ├── proxy.conf.json              proxy do `ng serve` para o BFF (desenvolvimento)
 │   ├── Dockerfile                   build Angular → Nginx
+│   └── package.json
+├── bff/                             Backend for Frontend (NestJS)
+│   ├── src/
+│   │   ├── config/                  leitura e validação das variáveis de ambiente
+│   │   ├── proxy/                   controller @All + serviço de proxy (node:http, streaming)
+│   │   ├── observability/           X-Correlation-Id e log JSON por requisição
+│   │   ├── health/                  /bff/health e /bff/health/ready
+│   │   ├── app.module.ts
+│   │   └── main.ts
+│   ├── test/
+│   │   ├── proxy.spec.ts            proxy contra um backend HTTP de teste
+│   │   └── regression/              cenários A–E contra o Docker Compose
+│   ├── Dockerfile                   build TypeScript → Node 24
 │   └── package.json
 ├── docs/                            arquitetura, exemplos REST, imagens
 ├── scripts/                         start/reset (sh e ps1)
-├── .github/workflows/ci.yml         testes + build + smoke test do Compose
-├── docker-compose.yml
+├── .github/workflows/ci.yml         testes + build + smoke test e regressão do Compose
+├── docker-compose.yml               ambiente completo (só o frontend publicado)
+├── docker-compose.dev.yml           publica BFF, backend e PostgreSQL para desenvolvimento
 ├── .env.example
 └── LICENSE
 ```
@@ -215,7 +249,11 @@ Copy-Item .env.example .env
 | Variável | Padrão | Descrição |
 |---|---|---|
 | `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | `flowablelab` / `flowablelab` / `flowablelab-local-only` | Credenciais **apenas do ambiente local** |
-| `POSTGRES_PORT` · `BACKEND_PORT` · `FRONTEND_PORT` | `5433` · `8080` · `4200` | Portas publicadas no host |
+| `FRONTEND_PORT` | `4200` | Porta publicada do frontend (única exposta por padrão) |
+| `POSTGRES_PORT` · `BACKEND_PORT` · `BFF_PORT` | `5433` · `8080` · `3000` | Portas publicadas **somente** com `docker-compose.dev.yml` |
+| `BACKEND_URL` | `http://backend:8080` | Endereço do Spring Boot usado pelo BFF (nome do serviço na rede Docker) |
+| `PROXY_TIMEOUT_MS` | `30000` | Tempo máximo para o backend começar a responder; depois disso o BFF devolve 504 |
+| `BFF_LOG_LEVEL` | `log` | Nível de log do BFF (`fatal`, `error`, `warn`, `log`, `debug`, `verbose`) |
 | `DEMO_DATA_ENABLED` | `true` | Cria exemplos na primeira inicialização |
 | `TZ` | `America/Sao_Paulo` | Fuso horário do backend |
 
@@ -234,21 +272,32 @@ Ou use os scripts, que criam o `.env` e aguardam os health checks:
 powershell -ExecutionPolicy Bypass -File scripts\start.ps1   # Windows
 ```
 
-O primeiro build leva alguns minutos (download das imagens e dependências). O Compose sobe três serviços,
-cada um com health check, reinício automático e limite de memória:
+O primeiro build leva alguns minutos (download das imagens e dependências). O Compose sobe quatro serviços,
+cada um com health check, reinício automático e limite de memória. **Apenas o frontend é publicado no host**;
+os demais se comunicam pela rede interna do Docker, pelo nome do serviço:
 
-| Serviço | Imagem | Porta | Health check |
-|---|---|---|---|
-| `postgres` | `postgres:17.6-alpine` (volume persistente) | 5433 (host) → 5432 | `pg_isready` |
-| `backend` | Java 25 + Spring Boot + Flowable | 8080 | `/actuator/health` |
-| `frontend` | Angular compilado + Nginx | 4200 | `/healthz` |
+| Serviço | Imagem | Porta interna | Publicada no host | Health check |
+|---|---|---|---|---|
+| `frontend` | Angular compilado + Nginx | 80 | **4200** | `/healthz` |
+| `bff` | NestJS (Node 24) | 3000 | só no modo dev (3000) | `/bff/health` |
+| `backend` | Java 25 + Spring Boot + Flowable | 8080 | só no modo dev (8080) | `/actuator/health` |
+| `postgres` | `postgres:17.6-alpine` (volume persistente) | 5432 | só no modo dev (5433) | `pg_isready` |
 
-O backend só inicia depois que o PostgreSQL está saudável, e o frontend depois do backend. Na inicialização o
-Spring Boot cria o schema do Flowable (se necessário), aplica as migrações Flyway, implanta os quatro BPMN sem
-duplicar versões, valida as definições e cria os dados demonstrativos (apenas na primeira vez).
+A ordem de inicialização é garantida por health checks (`depends_on: condition: service_healthy`), não pela
+ordem de criação: postgres → backend → bff → frontend. Na inicialização o Spring Boot cria o schema do Flowable
+(se necessário), aplica as migrações Flyway, implanta os quatro BPMN sem duplicar versões, valida as definições
+e cria os dados demonstrativos (apenas na primeira vez).
 
 ```bash
-docker compose ps        # os três serviços devem aparecer como (healthy)
+docker compose ps        # os quatro serviços devem aparecer como (healthy)
+```
+
+**Modo de desenvolvimento** — publica também BFF (3000), backend (8080) e PostgreSQL (5433), por exemplo para
+usar o `ng serve`, acessar o Swagger diretamente no backend ou conectar uma ferramenta de banco:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
+cd frontend && npm start        # http://localhost:4200 via ng serve, com proxy para o BFF em :3000
 ```
 
 ## 10. Como acessar o Angular
@@ -273,8 +322,11 @@ Telas: **Dashboard**, **Processos** (catálogo), **Solicitações**, **Tarefas**
 
 ## 11. Como acessar o Swagger
 
-- Swagger UI: **http://localhost:8080/swagger-ui.html** (também em http://localhost:4200/swagger-ui/index.html)
-- OpenAPI JSON: http://localhost:8080/v3/api-docs
+- Swagger UI: **http://localhost:4200/swagger-ui.html**
+- OpenAPI JSON: http://localhost:4200/v3/api-docs
+
+A documentação é do Spring Boot e chega ao navegador pelo mesmo caminho da aplicação (Nginx → BFF → backend).
+No modo de desenvolvimento ela também fica em http://localhost:8080/swagger-ui.html.
 
 Exemplos prontos para o VS Code REST Client / IntelliJ estão em [docs/api-examples.http](docs/api-examples.http).
 
@@ -289,7 +341,7 @@ para a página de detalhes.
 **Pela API:**
 
 ```bash
-curl -X POST http://localhost:8080/api/process-instances \
+curl -X POST http://localhost:4200/api/process-instances \
   -H "Content-Type: application/json" -H "X-Demo-User: colaborador" \
   -d '{"processKey":"purchaseApproval","requester":"Ana Souza","description":"Notebooks","amount":18500,"justification":"Renovação"}'
 ```
@@ -299,7 +351,7 @@ curl -X POST http://localhost:8080/api/process-instances \
 
 ```powershell
 $body = @{ processKey='purchaseApproval'; requester='Ana Souza'; description='Notebooks'; amount=18500 } | ConvertTo-Json
-Invoke-RestMethod -Method Post http://localhost:8080/api/process-instances `
+Invoke-RestMethod -Method Post http://localhost:4200/api/process-instances `
   -ContentType 'application/json' -Headers @{ 'X-Demo-User'='colaborador' } -Body $body
 ```
 </details>
@@ -316,10 +368,10 @@ diagrama e os indicadores são atualizados automaticamente. Também é possível
 
 ```bash
 # listar tarefas do gestor
-curl "http://localhost:8080/api/tasks?assignee=gestor"
+curl "http://localhost:4200/api/tasks?assignee=gestor"
 
 # rejeitar (o comentário é obrigatório)
-curl -X POST http://localhost:8080/api/tasks/<taskId>/complete \
+curl -X POST http://localhost:4200/api/tasks/<taskId>/complete \
   -H "Content-Type: application/json" -H "X-Demo-User: gestor" \
   -d '{"action":"REJECT","comment":"Fora da política de compras"}'
 ```
@@ -370,6 +422,12 @@ docker run --rm -v "$PWD/frontend":/app -w /app node:24-alpine sh -c "npm ci && 
 
 # Frontend — com Node 24 local
 cd frontend && npm ci && npm run test:ci
+
+# BFF — com Node 24 local (proxy testado contra um backend HTTP de teste, sem Flowable)
+cd bff && npm ci && npm test
+
+# Regressão funcional pela cadeia completa (requer `docker compose up` em execução)
+cd bff && REGRESSION_BASE_URL=http://localhost:4200 npm run test:regression
 ```
 
 O que é coberto:
@@ -380,14 +438,21 @@ O que é coberto:
   conclusão de processos e respostas de erro da API.
 - **Frontend (31 testes)**: serviços HTTP, interceptor, Signals, formulários, componentes, tratamento de erros e
   renderização dos estados BPMN.
+- **BFF (33 testes)**: encaminhamento de GET/POST/PUT/PATCH/DELETE, path, query strings repetidas, corpo,
+  cabeçalhos (`X-Demo-User`, `Authorization`, correlação), status 201/204, erros 400/401/403/404/409/422/500,
+  XML BPMN byte a byte, backend indisponível (502), timeout (504), ausência de retries e validação da configuração.
+- **Regressão via BFF (5 cenários)**: compra (A), paralelo com junção (B), férias assíncronas (C), acesso por
+  equipes (D) e visualização BPMN de instâncias ativa e finalizada (E). Cada resposta é conferida pelo
+  `X-Correlation-Id`, que só o BFF devolve — comprovando que a chamada passou pela nova camada.
 
-O GitHub Actions ([ci.yml](.github/workflows/ci.yml)) roda as duas suítes, o build de produção e um smoke test
-que sobe o `docker compose` completo.
+O GitHub Actions ([ci.yml](.github/workflows/ci.yml)) roda as três suítes, os builds de produção e, por fim,
+sobe o `docker compose` completo, verifica que o backend não está exposto e executa a regressão via BFF.
 
 ## 17. Como consultar os logs
 
 ```bash
 docker compose logs -f backend          # backend (Spring Boot + Flowable)
+docker compose logs -f bff              # BFF NestJS (uma linha JSON por requisição)
 docker compose logs -f frontend         # Nginx
 docker compose logs -f postgres
 docker compose logs --tail 200 backend | grep "pid:"   # linhas com processInstanceId
@@ -433,7 +498,9 @@ financeira pendente.
 - O seletor de perfil e o cabeçalho `X-Demo-User` são **apenas demonstrativos**: qualquer cliente pode enviar
   qualquer valor. O backend valida a elegibilidade para a tarefa, mas isso **não** é controle de acesso.
 - Não há JWT, OAuth2, HTTPS, CSRF, rate limiting nem auditoria de identidade.
-- O Swagger e o PostgreSQL ficam publicados no host para fins didáticos.
+- O Swagger fica acessível pelo frontend para fins didáticos. No modo de desenvolvimento, backend, BFF e
+  PostgreSQL também são publicados no host.
+- O BFF repassa o `X-Demo-User` sem interpretá-lo; toda a validação de perfis continua no Spring Boot.
 - As credenciais de `.env.example` são exclusivas do ambiente local.
 
 Para qualquer uso fora de uma máquina local seria preciso, no mínimo: um provedor de identidade
@@ -441,6 +508,53 @@ Para qualquer uso fora de uma máquina local seria preciso, no mínimo: um prove
 segredos gerenciados.
 
 ---
+
+## BFF NestJS
+
+O BFF (`bff/`) é uma camada **transparente** entre o Angular e o Spring Boot. Nesta versão ele não agrega,
+adapta nem autentica nada; apenas encaminha, observa e protege contra falhas de comunicação. A estrutura
+(um controller de proxy com rotas `@All`) permite acrescentar no futuro controllers próprios de agregação ou
+autenticação, sem alterar o backend.
+
+**Estratégia de proxy**
+
+- Um único `ProxyController` (`@All`) cobre `/api/*`, `/swagger-ui*` e `/v3/api-docs*` — não há endpoints duplicados.
+- O encaminhamento usa `node:http` com **streaming** nos dois sentidos e o body parser do Nest desligado: JSON,
+  XML BPMN, Problem Details, `201` com `Location`, `204` e respostas vazias passam sem conversão.
+- Método, path, query string (inclusive parâmetros repetidos) e cabeçalhos fim a fim — `Content-Type`,
+  `Authorization`, `X-Demo-User`, `Host` — são preservados; apenas cabeçalhos hop-by-hop são removidos.
+- **Sem retries**: início de processo e conclusão de tarefa nunca são reenviados automaticamente.
+- Backend inacessível → `502`; sem resposta em `PROXY_TIMEOUT_MS` → `504`. Ambos em Problem Details, sem detalhes internos.
+- `X-Correlation-Id`: reutiliza o recebido ou gera um UUID, envia ao Spring Boot e devolve ao navegador.
+- Log JSON por requisição com método, rota (sem query string), status, duração e correlação — sem corpos nem cabeçalhos.
+
+**Endpoints próprios** (não encaminhados):
+
+| Endpoint | Uso |
+|---|---|
+| `GET /bff/health` | Liveness, usado pelo health check do Docker |
+| `GET /bff/health/ready` | Readiness: verifica se o BFF alcança o `/actuator/health` do backend |
+
+**Como verificar que o Angular consome exclusivamente o BFF**
+
+1. `docker compose ps` — apenas `flowablelab-frontend` publica porta; `curl http://localhost:8080` não responde.
+2. No navegador (DevTools → Network), todas as chamadas vão para `http://localhost:4200/api/...` e trazem o
+   cabeçalho de resposta `x-correlation-id` (o Spring Boot não o emite).
+3. Envie um identificador e localize-o no log do BFF:
+
+   ```bash
+   curl -s -H "X-Correlation-Id: teste-bff-1" http://localhost:4200/api/dashboard/summary
+   docker compose logs bff | grep teste-bff-1
+   ```
+
+**Como diagnosticar falhas no BFF**
+
+| Sintoma | Verificação |
+|---|---|
+| Telas mostram "Serviço de processos indisponível" (502) | `docker compose exec bff wget -qO- http://127.0.0.1:3000/bff/health/ready` e `docker compose logs backend` |
+| "Tempo de resposta esgotado" (504) | O backend demorou mais que `PROXY_TIMEOUT_MS`; veja `docker compose logs bff` (mensagem `timeout do backend`) |
+| `bff` não fica `healthy` | `docker compose logs bff` — configuração inválida (`BACKEND_URL`, `PORT`, `PROXY_TIMEOUT_MS`) interrompe a inicialização com mensagem explícita |
+| Requisição sem resposta esperada | Pegue o `x-correlation-id` da resposta no navegador e procure-o em `docker compose logs bff` |
 
 ## Os quatro workflows
 
@@ -511,7 +625,9 @@ Todas as respostas de erro seguem **Problem Details (RFC 9457)**, sem stack trac
 
 | Sintoma | Solução |
 |---|---|
-| Porta 5433, 8080 ou 4200 em uso | Altere `POSTGRES_PORT`, `BACKEND_PORT` ou `FRONTEND_PORT` no `.env` |
+| Porta 4200 em uso | Altere `FRONTEND_PORT` no `.env` |
+| Porta 5433, 8080 ou 3000 em uso (modo dev) | Altere `POSTGRES_PORT`, `BACKEND_PORT` ou `BFF_PORT` no `.env` |
+| Erros 502/504 nas telas | Veja [Como diagnosticar falhas no BFF](#bff-nestjs) |
 | `backend` demora para ficar `healthy` | Normal no primeiro start (criação do schema do Flowable); veja `docker compose logs -f backend` |
 | Windows: `docker` não encontrado | Inicie o Docker Desktop e use o backend WSL 2 |
 | Testes do backend falham ao iniciar o contêiner | O Testcontainers precisa do Docker em execução |

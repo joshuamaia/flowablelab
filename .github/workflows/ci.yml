@@ -43,12 +43,34 @@ jobs:
       - run: npm run test:ci
       - run: npm run build
 
-  compose:
-    name: Docker Compose (smoke test)
+  bff:
+    name: BFF (NestJS)
     runs-on: ubuntu-latest
-    needs: [backend, frontend]
+    defaults:
+      run:
+        working-directory: bff
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: bff/package-lock.json
+      - run: npm ci
+      - run: npm run test:ci
+      - run: npm run build
+
+  compose:
+    name: Docker Compose (smoke + regressão via BFF)
+    runs-on: ubuntu-latest
+    needs: [backend, frontend, bff]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: bff/package-lock.json
       - name: Subir o ambiente completo
         run: |
           cp .env.example .env
@@ -56,10 +78,17 @@ jobs:
       - name: Verificar serviços
         run: |
           curl -fsS http://localhost:4200/healthz
-          curl -fsS http://localhost:8080/actuator/health | grep '"UP"'
+          docker compose exec -T bff wget -qO- http://127.0.0.1:3000/bff/health/ready | grep '"UP"'
           curl -fsS http://localhost:4200/api/process-definitions | grep -q parallelApproval
           curl -fsS http://localhost:4200/api/dashboard/summary
           curl -fsS -o /dev/null http://localhost:4200/swagger-ui/index.html
+          # Somente o frontend é publicado: o backend não deve responder no host
+          ! curl -fsS -m 3 http://localhost:8080/actuator/health
+      - name: Regressão funcional (Nginx -> BFF -> Spring Boot)
+        working-directory: bff
+        run: |
+          npm ci
+          REGRESSION_BASE_URL=http://localhost:4200 npm run test:regression
       - name: Logs em caso de falha
         if: failure()
         run: docker compose logs

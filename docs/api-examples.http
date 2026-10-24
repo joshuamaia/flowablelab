@@ -1,8 +1,9 @@
 ### Exemplos de requisições REST do FlowableLab
 ### Use com a extensão "REST Client" (VS Code) ou IntelliJ HTTP Client.
 ### O cabeçalho X-Demo-User apenas simula perfis (colaborador, gestor, ti) — NÃO é autenticação.
+### As chamadas seguem o mesmo caminho do navegador: Nginx (:4200) -> BFF NestJS -> Spring Boot.
 
-@api = http://localhost:8080/api
+@api = http://localhost:4200/api
 
 ### Definições implantadas (última versão)
 GET {{api}}/process-definitions

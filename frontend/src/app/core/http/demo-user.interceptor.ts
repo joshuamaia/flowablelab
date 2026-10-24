@@ -1,10 +1,11 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
+import { API_BASE_URL } from '../api/api.config';
 import { DemoUserStore } from '../state/demo-user.store';
 
 /** Anexa o perfil demonstrativo atual às chamadas da API. */
 export const demoUserInterceptor: HttpInterceptorFn = (req, next) => {
-  if (!req.url.startsWith('/api')) {
+  if (!req.url.startsWith(API_BASE_URL)) {
     return next(req);
   }
   const user = inject(DemoUserStore).userId();

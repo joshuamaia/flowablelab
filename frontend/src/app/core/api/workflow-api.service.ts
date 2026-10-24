@@ -23,6 +23,7 @@ import {
   WorkTask,
   WorkflowRequest,
 } from './api.models';
+import { API_BASE_URL } from './api.config';
 
 export interface PageParams {
   page?: number;
@@ -62,7 +63,7 @@ function toParams(filters: object): HttpParams {
 @Injectable({ providedIn: 'root' })
 export class WorkflowApi {
   private readonly http = inject(HttpClient);
-  private readonly base = '/api';
+  private readonly base = API_BASE_URL;
 
   // ----- usuários demonstrativos
   users(): Observable<DemoUser[]> {

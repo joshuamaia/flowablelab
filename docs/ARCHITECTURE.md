@@ -14,7 +14,13 @@ flowchart TB
         NG[Nginx: SPA + proxy /api]
     end
 
-    NG -- REST /api --> IF
+    NG -- "REST /api (http://bff:3000)" --> PX
+
+    subgraph BF["bff · NestJS 11 :3000 (rede interna)"]
+        PX[ProxyController @All<br/>streaming · correlação · logs · 502/504]
+    end
+
+    PX -- "BACKEND_URL (http://backend:8080)" --> IF
 
     subgraph BE["backend · Spring Boot 4.0 + Java 25 :8080"]
         IF[interfaces<br/>controllers · DTOs · Problem Details]
@@ -33,6 +39,14 @@ flowchart TB
     ENG -- "ACT_* (schema public)" --> DB[(PostgreSQL 17)]
     JPA -- "tabelas de negócio (schema business)" --> DB
 ```
+
+## BFF (Backend for Frontend)
+
+O navegador fala somente com o Nginx do frontend, que encaminha `/api`, `/swagger-ui` e `/v3/api-docs` ao
+BFF NestJS. O BFF é um proxy transparente: não interpreta corpos, não contém regras de negócio e não acessa o
+Flowable nem o banco. Toda a lógica de workflow e a validação de perfis permanecem no Spring Boot, cuja
+arquitetura hexagonal (abaixo) não foi alterada. Detalhes da estratégia de proxy estão no
+[README](../README.md#bff-nestjs).
 
 ## Camadas (arquitetura hexagonal)
 
