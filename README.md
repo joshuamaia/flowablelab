@@ -160,7 +160,7 @@ flowchart TB
 | Camada | Responsabilidade | Não faz |
 |---|---|---|
 | **Angular** (`frontend/`) | Telas, formulários, estado com Signals, visualizador bpmn-js. Chama apenas `/api` na própria origem. | Não conhece o endereço do BFF nem do backend |
-| **Nginx** (`frontend/nginx.conf`) | Serve o build do Angular e encaminha `/api`, `/swagger-ui` e `/v3/api-docs` ao BFF | Não fala com o backend |
+| **Nginx** (`frontend/nginx.conf`) | Serve o build do Angular e encaminha `/api`, `/swagger-ui` e `/v3/api-docs` ao BFF, resolvendo o nome `bff` pelo DNS do Docker a cada 10 s (recriar o BFF não exige reiniciar o frontend) | Não fala com o backend |
 | **BFF NestJS** (`bff/`) | Proxy transparente para o Spring Boot: preserva métodos, paths, query strings, corpos, cabeçalhos e status; adiciona `X-Correlation-Id`, logs estruturados, timeout e respostas 502/504 | Não contém regra de negócio, não acessa o Flowable nem o banco, não reenvia requisições |
 | **Spring Boot + Flowable** (`backend/`) | Regras de negócio, validação de perfis, execução dos workflows BPMN | — (inalterado em relação à V1) |
 | **PostgreSQL** | Tabelas do Flowable (`public`) e de negócio (`business`) | — |
@@ -555,6 +555,7 @@ autenticação, sem alterar o backend.
 | "Tempo de resposta esgotado" (504) | O backend demorou mais que `PROXY_TIMEOUT_MS`; veja `docker compose logs bff` (mensagem `timeout do backend`) |
 | `bff` não fica `healthy` | `docker compose logs bff` — configuração inválida (`BACKEND_URL`, `PORT`, `PROXY_TIMEOUT_MS`) interrompe a inicialização com mensagem explícita |
 | Requisição sem resposta esperada | Pegue o `x-correlation-id` da resposta no navegador e procure-o em `docker compose logs bff` |
+| 502 **sem** `x-correlation-id` na resposta | O erro veio do Nginx, antes do BFF: veja `docker compose logs frontend`. Logo após recriar o `bff`, aguarde até 10 s para o Nginx resolver o novo endereço |
 
 ## Os quatro workflows
 
